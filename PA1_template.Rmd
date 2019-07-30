@@ -7,19 +7,96 @@ output:
 
 
 ## Loading and preprocessing the data
-
+```{r data1, echo=TRUE}
+#First load the libraries needed for these studies
+library(dplyr)
+library(knitr)
+library(ggplot2)
+#Load the data file into a data frame
+activity <- read.csv("activity.csv")
+#Clean the dataset by removing NA values
+cleanData <- activity[ with(activity,{!(is.na(steps))}),]
+```
 
 
 ## What is mean total number of steps taken per day?
+```{r data2, echo=TRUE}
+#Calculate the total number of steps taken per day
+totalSteps <-aggregate(steps ~ date, cleanData, sum)
+```
 
+```{r chart1, echo=TRUE}
+#Create a Histogram of the total steps taken per day
+hist(totalSteps$steps, main = "Histogram of Total Steps per Day", xlab = "Number of Steps per Day")
+```
+
+```{r data3, echo=TRUE}
+#Calculate and report the mean and median of total steps per day
+summary(totalSteps)
+```
+The mean number of steps taken per day is 10,766, and the median is 10,765
 
 
 ## What is the average daily activity pattern?
+```{r chart2, echo=TRUE}
+#Plot time series of the average number of steps taken across all days
+meanInterval <- aggregate(steps ~ interval, data = cleanData, FUN="mean")
+plot(meanInterval$interval,meanInterval$steps, type ="l", main = "Average Steps over all Days", xlab ="Interval", ylab = "Avg. Number of Steps") 
+```
 
+```{r data4, echo=TRUE}
+#Find the max number of steps
+maxSteps <- which.max(meanInterval$steps)
+meanInterval[maxSteps,]
+```
 
 
 ## Imputing missing values
+```{r data5, echo=TRUE}
+#Calculate and report missing values
+sum(is.na(activity))
+```
 
+```{r chart3, echo=TRUE}
+#Impute data to original dataframe
+imputedActivity <- activity
+for (i in 1:nrow(imputedActivity)) {
+  if (is.na(imputedActivity$steps[i])) {
+    intSteps <- imputedActivity$interval[i]
+    newSteps <- meanInterval[
+      meanInterval$interval == intSteps,]
+    imputedActivity$steps[i] <- newSteps$steps
+  }
+}
+#Create new dataset with missing data filled in and make a histogram
+imputedActivity_Day <- aggregate(steps ~ date, imputedActivity, sum)
+hist(imputedActivity_Day$steps, main = "Histogram of Total Steps per Day - with Imputed Data", xlab = "Number of Steps per Day")
+```
+
+```{r data6, echo=TRUE}
+#Calculate the mean and median and compare vs. the original data
+summary(imputedActivity_Day)
+```
+Although the mean and median for the imputed activity dataset are only different by ~1-step vs. the original dataset, the 
+dispersion is wider as the 1st and 3rd quartiles are larger by ~500-1000 steps.
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r chart4, echo=TRUE}
+#Create a factor variable in the dataset for the two day types
+weekDay <- function(day) {
+	days <- weekdays(as.Date(day, "%Y-%m-%d"))
+	if(!(days == "Saturday" || days == "Sunday")) {
+		week <- "Weekday"
+	} else {
+		week <- "Weekend"
+	}
+	week
+}
+activity$dayWeek <- as.factor(sapply(activity$date, weekDay))
+stepsDay <- aggregate(steps ~ interval+dayWeek, activity, FUN = "mean")
+#Create a panel plot
+ggplot(stepsDay, aes(interval, steps)) + geom_line(stat = "identity", aes(color = dayWeek))+facet_grid(dayWeek~., scales = "fixed", space = "fixed") + labs(x="Interval", y="Number of Steps") + ggtitle("Number of Steps - Weekday vs. Weekend") + labs(color='Day Type')
+```
+
+The test subject is more active earlier in the day on weekdays vs. weekend days, but less active through the middle of the day. My guess is they have a normal 'desk' job during the week while they spend their weekends catching up on housework and chores.
